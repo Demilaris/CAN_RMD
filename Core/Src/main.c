@@ -20,11 +20,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "can.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "printf_SWO.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,12 +61,20 @@ CAN_TxHeaderTypeDef pHeader;
 //
 
 uint8_t aData[8];
+uint8_t aData_motor_of[8];
+uint8_t aData_motor_on[8];
 CAN_RxHeaderTypeDef pHeader_rd;
 uint8_t aData_rd[8];
 uint32_t pTxMailbox;
 CAN_FilterTypeDef sFilterConfig;
 //
 uint8_t Motor_ID;
+//bool flag = 0;
+
+
+
+//
+
 /* USER CODE END 0 */
 
 /**
@@ -75,6 +85,9 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	HAL_StatusTypeDef status;
+	HAL_StatusTypeDef status_motor_on;
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -96,6 +109,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CAN1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   printf("CAN_motor\r\n");
@@ -129,6 +143,27 @@ int main(void)
   pHeader.StdId = 0x140 + Motor_ID;
   pHeader.IDE = 0; //Standard identifier.
   pHeader.RTR = 0; //Data frame
+
+
+ status =  HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
+//  status = HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
+  aData_motor_on[0] = 0xA1;
+  aData_motor_on[1] = 0x00;
+  aData_motor_on[2] = 0x00;
+  aData_motor_on[3] = 0x00;
+  aData_motor_on[4] = 0xA;
+  aData_motor_on[5] = 0x00;
+  aData_motor_on[6] = 0x00;
+  aData_motor_on[7] = 0x00;
+    aData_motor_of[0] = 0x81;
+    aData_motor_of[1] = 0x00;
+    aData_motor_of[2] = 0x00;
+    aData_motor_of[3] = 0x00;
+    aData_motor_of[4] = 0x00;
+    aData_motor_of[5] = 0x00;
+    aData_motor_of[6] = 0x00;
+    aData_motor_of[7] = 0x00;
+
   aData[0] = 0x88;
   aData[1] = 0x00;
   aData[2] = 0x00;
@@ -137,20 +172,50 @@ int main(void)
   aData[5] = 0x00;
   aData[6] = 0x00;
   aData[7] = 0x00;
-  status = HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
+//    status_motor_of = HAL_CAN_AddTxMessage(&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
+
   //printf("HAL_CAN_AddTxMessage - status - %d\r\n",status);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+
   while (1)
   {
 //	 status = HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
 //	 printf("HAL_CAN_AddTxMessage - status - %d\r\n",status);
-	 //if()
+//	 if(flag)
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+//	 else
+//		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+// printf("flag-status %d\r\n",flag);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+////		printf("while is working\r\n");
+//	  if (!HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13))
+//	  {
+
+//	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13))
+//	  {
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+//	  }
+//	  else
+//	  {
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+//	  }
+//	  }
+//	  else
+//	  {
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+//	  }
+//	  else
+//	  HAL_Delay(500);
+//	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+//	  HAL_Delay(500);
+
   }
   /* USER CODE END 3 */
 }
@@ -212,6 +277,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback (CAN_HandleTypeDef * hcan)
 	if(HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &pHeader_rd, aData_rd) != HAL_OK)
 	{
 		printf("HAL_CAN_GetRxMessage Error\r\n");
+
 	}
 	else
 	{
@@ -219,9 +285,32 @@ void HAL_CAN_RxFifo0MsgPendingCallback (CAN_HandleTypeDef * hcan)
 		for (i = 0; i <pHeader_rd.DLC; i++)
 		{
 			printf(" %x ", aData_rd[i]);
+
 		}
 		printf("\r\n");
 	}
+
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == GPIO_PIN_10)
+	{
+//	HAL_CAN_AddTxMessage(&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
+//	HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
+	HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
+	}
+	else if (GPIO_Pin == GPIO_PIN_13)
+	{
+		HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_on, &pTxMailbox);
+}
+
+	else
+	{
+		__NOP();
+	}
+
+
 }
 /* USER CODE END 4 */
 
