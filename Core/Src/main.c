@@ -21,6 +21,7 @@
 #include "main.h"
 #include "can.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -59,7 +60,7 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN 0 */
 CAN_TxHeaderTypeDef pHeader;
 //
-
+HAL_StatusTypeDef status;
 uint8_t aData[8];
 uint8_t aData_motor_of[8];
 uint8_t aData_motor_on[8];
@@ -84,9 +85,8 @@ uint8_t Motor_ID;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	HAL_StatusTypeDef status;
-	HAL_StatusTypeDef status_motor_on;
-
+	uint32_t TIM2_prev = 0; // предыдущ. значение
+uint8_t pTxData[200];
 
   /* USER CODE END 1 */
 
@@ -110,12 +110,18 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN1_Init();
   MX_TIM6_Init();
+  MX_UART5_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
-  printf("CAN_motor\r\n");
+	sprintf((char *)pTxData, "CAN_motor\r\n");
+	status = HAL_UART_Transmit (&huart5, pTxData, strlen((char *)pTxData), 200);
+	 status = HAL_TIM_Encoder_Start (&htim2, TIM_CHANNEL_ALL);
   if(HAL_CAN_Start(&hcan1) != HAL_OK) // включили CAN
   {
-	  printf("HAL_CAN_start Err\r\n");
+		sprintf((char *)pTxData, "HAL_CAN_start Err\r\n");
+		status = HAL_UART_Transmit (&huart5, pTxData, strlen((char *)pTxData), 200);
+		 status = HAL_TIM_Encoder_Start (&htim2, TIM_CHANNEL_ALL);
+
   }
   sFilterConfig.FilterBank = 0;
   sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -138,7 +144,7 @@ int main(void)
 	  printf("HAL_CAN_ActivateNotofication Err\r\n");
   }
 
-  Motor_ID = 8;
+  Motor_ID = 2;
   pHeader.DLC = 8;
   pHeader.StdId = 0x140 + Motor_ID;
   pHeader.IDE = 0; //Standard identifier.
@@ -147,33 +153,34 @@ int main(void)
 
  status =  HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
 //  status = HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
-  aData_motor_on[0] = 0xA1;
-  aData_motor_on[1] = 0x00;
-  aData_motor_on[2] = 0x00;
-  aData_motor_on[3] = 0x00;
-  aData_motor_on[4] = 0xA;
-  aData_motor_on[5] = 0x00;
-  aData_motor_on[6] = 0x00;
-  aData_motor_on[7] = 0x00;
-    aData_motor_of[0] = 0x81;
-    aData_motor_of[1] = 0x00;
-    aData_motor_of[2] = 0x00;
-    aData_motor_of[3] = 0x00;
-    aData_motor_of[4] = 0x00;
-    aData_motor_of[5] = 0x00;
-    aData_motor_of[6] = 0x00;
-    aData_motor_of[7] = 0x00;
+aData_motor_on[0] = 0xA1;
+aData_motor_on[1] = 0x00;
+aData_motor_on[2] = 0x00;
+aData_motor_on[3] = 0x00;
+aData_motor_on[4] = 0xA;
+aData_motor_on[5] = 0xA;
+aData_motor_on[6] = 0x00;
+aData_motor_on[7] = 0x00;
 
-  aData[0] = 0x88;
-  aData[1] = 0x00;
-  aData[2] = 0x00;
-  aData[3] = 0x00;
-  aData[4] = 0x00;
-  aData[5] = 0x00;
-  aData[6] = 0x00;
-  aData[7] = 0x00;
+aData_motor_of[0] = 0x80;
+aData_motor_of[1] = 0x00;
+aData_motor_of[2] = 0x00;
+aData_motor_of[3] = 0x00;
+aData_motor_of[4] = 0x00;
+aData_motor_of[5] = 0x00;
+aData_motor_of[6] = 0x00;
+aData_motor_of[7] = 0x00;
+
+aData[0] = 0x88;
+aData[1] = 0x00;
+aData[2] = 0x00;
+aData[3] = 0x00;
+aData[4] = 0x00;
+aData[5] = 0x00;
+aData[6] = 0x00;
+aData[7] = 0x00;
 //    status_motor_of = HAL_CAN_AddTxMessage(&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
-
+status = HAL_TIM_Encoder_Start (&htim2, TIM_CHANNEL_ALL);
   //printf("HAL_CAN_AddTxMessage - status - %d\r\n",status);
   /* USER CODE END 2 */
 
@@ -183,38 +190,15 @@ int main(void)
 
   while (1)
   {
-//	 status = HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
-//	 printf("HAL_CAN_AddTxMessage - status - %d\r\n",status);
-//	 if(flag)
-//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-//	 else
-//		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-// printf("flag-status %d\r\n",flag);
-
+	  if(TIM2->CNT != TIM2_prev)
+	  	  	  	 {
+	  	  	  	  TIM2_prev = TIM2->CNT; // предыдущ. значение
+	  	  	  	  	sprintf((char *)pTxData, "%ld\r\n", TIM2_prev);
+	  	  	  		status = HAL_UART_Transmit (&huart5, pTxData, strlen((char *)pTxData), 200);
+	  	  	  	 }
     /* USER CODE END WHILE */
-
     /* USER CODE BEGIN 3 */
-////		printf("while is working\r\n");
-//	  if (!HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13))
-//	  {
 
-//	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13))
-//	  {
-//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-//	  }
-//	  else
-//	  {
-//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-//	  }
-//	  }
-//	  else
-//	  {
-//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-//	  }
-//	  else
-//	  HAL_Delay(500);
-//	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-//	  HAL_Delay(500);
 
   }
   /* USER CODE END 3 */
@@ -228,6 +212,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
   */
@@ -268,6 +253,12 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_UART5;
+  PeriphClkInitStruct.Uart5ClockSelection = RCC_UART5CLKSOURCE_PCLK1;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /* USER CODE BEGIN 4 */
@@ -294,22 +285,23 @@ void HAL_CAN_RxFifo0MsgPendingCallback (CAN_HandleTypeDef * hcan)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (GPIO_Pin == GPIO_PIN_10)
+	if (GPIO_Pin == GPIO_PIN_11)
 	{
-//	HAL_CAN_AddTxMessage(&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
 //	HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData, &pTxMailbox);
 	HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_of, &pTxMailbox);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
 	}
-	else if (GPIO_Pin == GPIO_PIN_13)
+	else if (GPIO_Pin == GPIO_PIN_10)
 	{
 		HAL_CAN_AddTxMessage (&hcan1, &pHeader, aData_motor_on, &pTxMailbox);
+		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
 }
 
 	else
 	{
 		__NOP();
 	}
-
 
 }
 /* USER CODE END 4 */
